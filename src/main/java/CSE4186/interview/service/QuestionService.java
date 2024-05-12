@@ -1,5 +1,6 @@
 package CSE4186.interview.service;
 
+import CSE4186.interview.service.TextToSpeechService;
 import CSE4186.interview.controller.dto.BaseResponseDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -12,11 +13,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import javax.sound.sampled.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+
+
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.IntStream;
 
@@ -28,11 +36,15 @@ public class QuestionService {
 
     private final String apiKey;
     private final ObjectMapper objectMapper;
-    private String prompt="넌 이제부터 면접관이야. 아래에 있는 자기소개서를 읽고 질문 %d개를 만들어줘. 이 때, 질문 앞에 1. 2. 처럼 숫자와 온점을 찍어서 질문을 구분해줘. 예를 들면 1. 하기 싫은 업무를 맡게 되면 어떻게 할 것인가요? << 이런식으로.\n 이제 자기소개서를 보내줄게.";
+    private String prompt="넌 이제부터 면접관이야. 아래에 있는 자기소개서를 읽고 질문 %d개를 만들어줘. 이 때, 질문 앞에 1. 2. 처럼 숫자와 온점을 찍어서 질문을 구분해줘. 예를 들면 1. 하기 싫은 업무를 맡게 되면 어떻게 할 것인가요? << 이런식으로. 질문 개수는 꼭 맞춰서 생성해줘. \n  이제 자기소개서를 보내줄게.";
 
-    public QuestionService(@Value("${google.api-key}") String secret, ObjectMapper objectMapper){
+    private TextToSpeechService textToSpeechService;
+
+    // Constructor to inject TextToSpeechService dependency
+    public QuestionService(@Value("${google.api-key}") String secret, ObjectMapper objectMapper, TextToSpeechService textToSpeechService){
         apiKey=secret;
         this.objectMapper = objectMapper;
+        this.textToSpeechService = textToSpeechService;
     }
 
     @Builder
@@ -84,8 +96,8 @@ public class QuestionService {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
 
         RestTemplate template = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
-        prompt=String.format(prompt,questionNum);
-        String requestBody=createRequestBody(selfIntroductionContent);
+        String promptWithNum = String.format(prompt,questionNum);
+        String requestBody=createRequestBody(promptWithNum, selfIntroductionContent);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -109,24 +121,50 @@ public class QuestionService {
                     .map(q->q.replaceAll("\\d+\\.","").trim())
                     .toArray(String[]::new);
 
-            List<Map<String,String>> taggedQuestions=new ArrayList<>();
-            IntStream.range(0, rawQuestions.length)
-                    .forEach(index->{
-                        Map<String,String> taggedQuestionMap=new HashMap<>();
-                        taggedQuestionMap.put(Integer.toString(index),rawQuestions[index]);
-                        taggedQuestions.add(taggedQuestionMap);
-                    });
+            // Initialize a list to store JSON objects representing questions with text and audio data
+            //[{index, {text, audio}}, {index, {text, audio}}, ....]
+            List<Map<String,Map<String, Object>>> taggedQuestionAudioPairs = new ArrayList<>();
 
-            Map<String, List<Map<String,String>>> questionToJson = new HashMap<>();
-            questionToJson.put("questions",taggedQuestions);
+            // Iterate over the raw questions
+            for (int i = 0; i < rawQuestions.length; i++){
 
+                String rawQuestion = rawQuestions[i];
+                try {
+                    // Generate speech for the question using TextToSpeechService
+                    byte[] audioData = textToSpeechService.synthesizeText(rawQuestion);
+
+                    // Convert audio data to base64 string
+                    String audioBase64 = Base64.getEncoder().encodeToString(audioData);
+
+                    // Create a map to store question with text and audio data
+                    Map<String, Object> questionAudioPair = new HashMap<>();
+                    questionAudioPair.put(rawQuestion, audioBase64);
+
+                    Map<String, Map<String, Object>> taggedQuestionAudioPair = new HashMap<>();
+                    taggedQuestionAudioPair.put(Integer.toString(i), questionAudioPair);
+
+
+                    // Add the question with text and audio data to the list
+                    taggedQuestionAudioPairs.add(taggedQuestionAudioPair);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Handle the exception appropriately
+                }
+            }
+
+            Map<String, List<Map<String,Map<String, Object>>>> questionToJson = new HashMap<>();
+            questionToJson.put("questions",taggedQuestionAudioPairs);
+
+            ObjectMapper objectMapper = new ObjectMapper();
             try {
-                String jsonResponseString = objectMapper.writeValueAsString(questionToJson);
+                String jsonOutput = objectMapper.writeValueAsString(questionToJson);
+                // Print or save the JSON output as needed
+                //System.out.println(jsonOutput);
                 return ResponseEntity.ok(
                         new BaseResponseDto<String>(
                                 "success",
-                            "",
-                                    jsonResponseString
+                                "",
+                                jsonOutput
                         )
                 );
             } catch (JsonProcessingException e) {
@@ -138,7 +176,6 @@ public class QuestionService {
                         )
                 );
             }
-
         } catch (Exception e){
             e.printStackTrace();
             return ResponseEntity.ok(
@@ -152,9 +189,9 @@ public class QuestionService {
 
     }
 
-    public String createRequestBody(String selfIntroductionContent) throws Exception {
+    public String createRequestBody(String promptWithNum, String selfIntroductionContent) throws Exception {
 
-        String requirements = prompt + "\n" + selfIntroductionContent;
+        String requirements = promptWithNum + "\n" + selfIntroductionContent;
 
         ApiRequestBody apiRequestBody = ApiRequestBody.builder()
                 .contents(Arrays.asList(ApiRequestBody.Contents.builder()
