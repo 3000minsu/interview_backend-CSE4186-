@@ -1,15 +1,16 @@
 package CSE4186.interview.entity;
 
+import CSE4186.interview.controller.dto.VideoDto;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 @Entity
@@ -26,5 +27,16 @@ public class Video extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
+
+    public VideoDto.Response toVideoResponse() {
+        return VideoDto.Response.builder()
+                .id(this.id)
+                .title(this.title)
+                .link(this.link)
+                .userId(user.getId())
+                .createdAt(this.getCreatedAt())
+                .updatedAt(this.getUpdatedAt())
+                .build();
+    }
 
 }

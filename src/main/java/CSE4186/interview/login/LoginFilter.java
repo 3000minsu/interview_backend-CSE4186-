@@ -29,8 +29,10 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
             throws AuthenticationException {
+        logger.info("hi");
         try (InputStream is=request.getInputStream()){
             ObjectMapper objectMapper=new ObjectMapper();
+            logger.info("login filter running...");
             JsonNode jsonNode=objectMapper.readTree(is);
             String username=jsonNode.get("email").asText();
             String password=jsonNode.get("password").asText();
@@ -43,6 +45,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return authentication;
         } catch (IOException e) {
+            logger.info("here");
             throw new AuthenticationServiceException("JSON 입력 형식 오류");
         }
     }
@@ -52,12 +55,24 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
                                             Authentication authResult) throws IOException, ServletException {
         logger.info("login success");
 
-        //Access Token
+        //1. accessToken 생성
         String AccessJwt=tokenProvider.createAccessToken(authResult);
+
+        //2. 헤더에 담는다.
         response.setHeader("Authorization","Bearer "+AccessJwt);
 
-        //save user at securityContext
-        logger.info(authResult.getName());
+        //3. refreshToken 생성
+        String refreshToken=tokenProvider.createRefreshToken(authResult,null);
+
+        //4. 쿠키에 담기
+        response.setHeader("Set-Cookie",
+                "refreshToken="+refreshToken+"; "+
+                        "Path=/;" +
+                        "Domain=localhost; " +
+                        "HttpOnly; " +
+                        "Secure; "+
+                        "Max-Age=604800; "
+        );
 
         chain.doFilter(request,response);
     }

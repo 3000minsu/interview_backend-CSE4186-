@@ -11,6 +11,10 @@ java {
 	sourceCompatibility = '21'
 }
 
+jar {
+	enabled = false
+}
+
 configurations {
 	compileOnly {
 		extendsFrom annotationProcessor
@@ -24,12 +28,17 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.0.2'
+
+	//actuator
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	//프로메테우스
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
 	//test 롬복 사용
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -37,6 +46,9 @@ dependencies {
 	//spring security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+
 
 	//Querydsl 추가
 	implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
@@ -49,13 +61,16 @@ dependencies {
 	implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
 	implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
+
+	//HttpClient
+	implementation group: 'org.apache.httpcomponents.client5', name: 'httpclient5', version: '5.3.1'
+
 	//tts
 	implementation 'com.google.cloud:google-cloud-texttospeech:2.43.0'
 
-	//webClient
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
-	//swagger? 이 라인 설치 없이 webClient dependency만 추가했을 때는 설치 에러 발생함.
-	//implementation 'org.springdoc:springdoc-openapi-webflux-ui:1.5.12'
+	//redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
 }
 
 tasks.named('test') {

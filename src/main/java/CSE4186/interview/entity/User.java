@@ -1,5 +1,6 @@
 package CSE4186.interview.entity;
 
+import CSE4186.interview.login.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -12,16 +13,11 @@ import java.util.Set;
 
 @Entity
 @Getter
+@AllArgsConstructor
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class User extends BaseTimeEntity {
-
-    @Builder
-    public User(String name, String email, String password){
-        this.name=name;
-        this.email=email;
-        this.password=password;
-    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,28 +33,30 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private String password;
 
+    private Boolean suspensionStatus = false;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-            name="member_authority",
-            joinColumns={@JoinColumn(name="member_id",referencedColumnName = "user_id")},
-            inverseJoinColumns={@JoinColumn(name="authority_name",referencedColumnName = "authority")}
-    )
-    private Set<Authority> authoritySet = new HashSet<>();
+    @Enumerated(EnumType.STRING)
+    private Role authority;
 
-    public User(String name, String email, String password, Authority authority){
+    public User(String name, String email, String password, Role authority){
         this.name=name;
         this.email=email;
         this.password=password;
-        authoritySet.add(authority);
+        this.authority=authority;
     }
 
-    public User(String name, String email, Authority authority){
+    public User(String name, String email, Role authority){
         this.name=name;
         this.email=email;
         this.password="";
-        authoritySet.add(authority);
+        this.authority=authority;
     }
 
+    public boolean isSuspended() {
+        return this.getAuthority() == Role.SUSPEND;
+    }
 
+    public void accountSuspension() {
+        this.authority = Role.SUSPEND;
+    }
 }

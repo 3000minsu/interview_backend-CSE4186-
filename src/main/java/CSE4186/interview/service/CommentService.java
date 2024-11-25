@@ -1,18 +1,13 @@
 package CSE4186.interview.service;
 
-import CSE4186.interview.controller.dto.CommentDto;
-import CSE4186.interview.controller.dto.PostDto;
-import CSE4186.interview.entity.Comment;
-import CSE4186.interview.entity.Post;
-import CSE4186.interview.entity.User;
-import CSE4186.interview.repository.CommentRepository;
-import CSE4186.interview.repository.PostRepository;
-import CSE4186.interview.repository.UserRepository;
+import CSE4186.interview.entity.*;
+import CSE4186.interview.exception.NotFoundException;
+import CSE4186.interview.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.NoSuchElementException;
+import java.util.List;
 
 import static CSE4186.interview.controller.dto.CommentDto.*;
 
@@ -22,36 +17,46 @@ import static CSE4186.interview.controller.dto.CommentDto.*;
 public class CommentService {
 
     private final CommentRepository commentRepository;
+    private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final PostRepository postRepository;
+    private final AlarmRepository alarmRepository;
 
-    public Comment addComment(createRequest request, Long postId) {
+    public void addComment(CreateRequest request, Long postId) {
         User findUser = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new NoSuchElementException("no user"));
+                .orElseThrow(() -> new NotFoundException("해당 유저가 존재하지 않습니다."));
 
         Post findPost = postRepository.findById(postId)
-                .orElseThrow(() -> new NoSuchElementException("no post"));
+                .orElseThrow(() -> new NotFoundException("해당 게시글이 존재하지 않습니다."));
 
 
-        return commentRepository.save(Comment.builder()
-                .user(findUser)
-                .post(findPost)
-                .content(request.getContent())
-                .build());
-
+        commentRepository.save(request.toEntity(findUser, findPost));
+        registerAlarm(findUser, findPost);
     }
 
-    public void updateComment(updateRequest request) {
+    public void updateComment(UpdateRequest request) {
         Comment comment = commentRepository.findById(request.getId()).orElseThrow(() ->
-                new IllegalArgumentException("해당 댓글이 존재하지 않습니다. id=" + request.getId()));
+                new NotFoundException("해당 댓글이 존재하지 않습니다."));
 
         comment.updateComment(request.getContent());
     }
 
     public void deleteComment(Long id) {
         Comment comment = commentRepository.findById(id).orElseThrow(() ->
-                new IllegalArgumentException("해당 댓글이 존재하지 않습니다. id=" + id));
+                new NotFoundException("해당 댓글이 존재하지 않습니다."));
+
+        List<Report> reports = reportRepository.findReportByComment(comment);
+        reports.forEach(Report::removeParentRelation);
 
         commentRepository.delete(comment);
+    }
+
+    private void registerAlarm(User by, Post post) {
+        alarmRepository.save(Alarm.builder()
+                .isRead(false)
+                .content(by.getName() + "님이 댓글을 추가하였습니다.")
+                .user(post.getUser())
+                .post(post)
+                .build());
     }
 }

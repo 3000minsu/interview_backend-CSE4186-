@@ -6,8 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+import java.util.Map;
 
-//dto에 schema
+
 public class QuestionDto {
 
     @Data
@@ -17,6 +19,21 @@ public class QuestionDto {
     @Schema(name = "questionCreateRequest", description = "질문 생성 DTO")
     public static class Request{
         private int questionNum;
-        private String content;
+        private int selfIntroductionId;
+        private int deptNum;
+        private List<String> additionalQuestions;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @Schema(name="followUpQuestionCreateRequest",description = "꼬리 질문 생성 DTO")
+    public static class followUpRequest{
+        private int turn;
+        private int selfIntroductionId;
+        private int deptNum;
+        private List<Map<String,String>> questions;
+        private String userAudio;
     }
 }
