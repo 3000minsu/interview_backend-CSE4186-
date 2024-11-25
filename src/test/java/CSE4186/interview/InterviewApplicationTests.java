@@ -10,6 +10,11 @@ class InterviewApplicationTests {
 
 	@Test
 	void contextLoads() {
+//<<<<<<< HEAD
+		//test
+//=======
+		//branch 20191620
+//>>>>>>> 89c9a7d6b2f559de4336c320bad74cf912baa08f
 	}
 
 }
